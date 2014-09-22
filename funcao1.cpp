@@ -11,7 +11,13 @@ typedef std::vector<Record> Page;
 #define REG_SIZE 10
 
 int fixed_len_sizeof(Record *record){ 
-        return  (REG_SIZE * record->size());
+        //return  (REG_SIZE * record->size());
+    int length = 0;
+    for (int i = 0; i < record.size(); i ++)
+    {
+        length = length + sizeof(record[i]);
+    }
+    return length;
 }
 
 void fixed_len_write(Record *record, void *buf) {
