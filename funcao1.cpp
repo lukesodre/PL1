@@ -17,8 +17,12 @@ typedef struct {
 #define ATTR_TOTAL 100
 
 int fixed_len_sizeof(Record *record){
-//         printf("length: %d\n",strlen(record->at(0)));
-        return   strlen(record->at(0));
+   int sum = 0; 
+   
+   for(int i=0;i<record->size();i++)
+       sum += strlen(record->at(i));
+   
+   return   sum;
 }
 
 void fixed_len_write(Record *record, void *buf) {
