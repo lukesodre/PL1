@@ -1,33 +1,4 @@
-#include <vector>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <iostream>
-typedef const char* V;
-typedef std::vector<V> Record;
-typedef std::vector<Record *> Slots;
-
-typedef struct {
-    void *data;
-    int page_size;
-    int slot_size;
-} Page;
-
-typedef struct {
-    FILE *file_ptr;
-    int page_size;
-} Heapfile;
-
-typedef int PageID;
-
-typedef struct {
-    int page_id;
-    int slot;
-} RecordID;
-
-#define REG_SIZE 10
-#define ATTR_TOTAL 100
+#include "heapfile.h"
 
 int fixed_len_sizeof(Record *record){
    int sum = 0; 
