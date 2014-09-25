@@ -7,11 +7,24 @@
 typedef const char* V;
 typedef std::vector<V> Record;
 typedef std::vector<Record *> Slots;
+
 typedef struct {
     void *data;
     int page_size;
     int slot_size;
 } Page;
+
+typedef struct {
+    FILE *file_ptr;
+    int page_size;
+} Heapfile;
+
+typedef int PageID;
+
+typedef struct {
+    int page_id;
+    int slot;
+} RecordID;
 
 #define REG_SIZE 10
 #define ATTR_TOTAL 100
@@ -24,11 +37,11 @@ int fixed_len_sizeof(Record *record){
    
    return   sum;
 }
-
+ 
 void fixed_len_write(Record *record, void *buf) {
     char *buf_return = new char[fixed_len_sizeof(record)];
     for(std::vector<V>::iterator i = record->begin(); i != record->end(); i++) {
-        //printf("%s -- sizeof: %ld\n", *i, sizeof(**i));
+        //printf("%s -- sizeof: %ld\n", *i, sizof(**i));
         memcpy(buf, *i, REG_SIZE);
         //printf("%s -- sizeof: %ld\n", (unsigned char *) buf, sizeof(buf));
         //memcpy(buf_return, (char *) buf, REG_SIZE);
@@ -140,6 +153,153 @@ int read_fixed_len_page(Page *page, int slot, Record *& r){
    
    //save the record in record
    r = a->at(slot); 
+}
+
+
+//The first thing is find how many pages a Heap page fits
+//Using 1 int to store the page link
+// And 1 int to store the pID and 1 int to store the freespace
+int _nPages(Heapfile *heapfile){
+    return (heapfile->page_size - 1*sizeof(int))/(2 * sizeof(int)); //Number of pages
+}
+//This function seet the file pointer to the last Heap File page 
+// and return the HeapPageId of the last non 0
+int _HeapLastPage(Heapfile *heapfile){
+    FILE * file = heapfile->file_ptr;
+    rewind(file);
+    int heapPageId, lastHeapPageId;
+    int nPages = _nPages(heapfile);
+
+    heapPageId = 0;
+    lastHeapPageId = 0;
+    fread(&lastHeapPageId,sizeof(int),1,file); 
+    //Check if the Heap file has been already created;
+    if(-1 == lastHeapPageId){
+        return -1;
+    }
+    
+    
+    do{  
+        lastHeapPageId = heapPageId;
+        //page_size * ofsset * (pages_of_records + page of heap) 
+        fseek(file, heapfile->page_size*heapPageId*(nPages + 1), SEEK_SET);  
+        fread(&heapPageId,sizeof(int),1,file); 
+        
+    }while(heapPageId != 0);
+
+
+    return lastHeapPageId;
+}
+
+//This is used to set the slots and set the free space
+void _new_heapfile(Heapfile *heapfile){
+    FILE * file = heapfile->file_ptr;
+
+    //The first element is the link to other heap page
+    //0 means that is not such page
+    int file_init = 0;
+    int nPages = _nPages(heapfile);
+    int lastPageId = _HeapLastPage(heapfile);
+    int offset = 0;
+
+    //Update the link of the last Heap Page;
+    if(lastPageId > 0){
+        offset = (lastPageId+1)*(nPages+1)*heapfile->page_size;
+        fseek(file,offset,SEEK_SET);
+        lastPageId++;
+        fwrite(&lastPageId,sizeof(int),1,file);
+    }
+
+
+    //set the Offset the new page
+    offset = (lastPageId+1)*(nPages+1)*heapfile->page_size;
+    fseek(file,offset,SEEK_SET);
+    
+    //Set the pointer after the heapPageId
+    fwrite(&file_init,sizeof(int),1,file);
+    
+    //Inicializates the page with the blank values
+    for(int i = 0; i < nPages; i++){
+        file_init = (lastPageId+1)*(nPages)+i;
+        fwrite(&file_init,sizeof(int),1,file);
+        fwrite(&heapfile->page_size,sizeof(int),1,file);
+    }
+
+}
+
+void init_heapfile(Heapfile *heapfile, int page_size, FILE *file){
+
+    heapfile->page_size = page_size;
+    heapfile->file_ptr = file;
+
+    //Set the flag saying that the heap file dont exits yet;
+    rewind(file);
+    int file_init = -1;
+    fwrite(&file_init,sizeof(int),1,file);
+    
+    //build the heapfile
+    _new_heapfile(heapfile);
+
+    //Go to the file begining and write 0 to show that is no other page
+    rewind(file);    
+
+}
+
+// This finds the next available slot in the heapfile
+// íf there is no slot returns -1;
+// or the HeapPageId if sucess
+int _nextSlot(Heapfile *heapfile,int * _heapPageId){
+    FILE * file = heapfile->file_ptr;
+    int nPages = _nPages(heapfile);//# of pages slots inside a Heap Page
+    int heapPageId = 0;
+    int pageId = 0;
+    int freeSpace = 0;
+
+    rewind(file);
+    do{
+        //This is the last heapPageId there is not 0
+        *_heapPageId = heapPageId; 
+        
+        //Get the first heapPageId
+        fread(&heapPageId,sizeof(int),1,file); 
+
+        //Go trough a Heap Page
+        for(int j=0;j<nPages;j++){
+            fread(&pageId,sizeof(int),1,file); 
+            fread(&freeSpace,sizeof(int),1,file); 
+            
+            if(freeSpace == heapfile->page_size)
+                return pageId;
+        }
+
+        //Go the next Heap Page
+        fseek(file, heapfile->page_size*heapPageId*(nPages+1)*heapPageId,SEEK_SET);
+    }while(heapPageId != 0);
+    
+    return -1;
+}
+
+
+
+
+
+PageID alloc_page(Heapfile *heapfile){
+
+    FILE * file = heapfile->file_ptr;
+    //Fist we need to get the HeapPageId of the last page;
+    int *nextHeapId;
+    int nextSlot = _nextSlot(heapfile,nextHeapId);
+    //Check if there is any slot available on the Heapfile
+    if(nextSlot != -1)
+        return nextSlot;
+    
+    //There isnt any free slot 
+    // We need to create a new HeapFile Page
+    _new_heapfile(heapfile);
+
+    // We should have a free slot now
+    return _nextSlot(heapfile,nextHeapId);
+
 }
 
 int main() {
