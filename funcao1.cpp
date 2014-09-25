@@ -273,6 +273,38 @@ PageID alloc_page(Heapfile *heapfile){
 
 }
 
+
+/**
+ * Read a page into memory
+ */
+void read_page(Heapfile *heapfile, PageID pid, Page *page){
+    FILE * file = heapfile->file_ptr;
+
+    int offset;
+    int heapPageId;
+    int nPages = _nPages(heapfile);
+    int pagePos; //Page position inside of a heap file page
+    void *data;
+    //We need to go to the page pid offset
+    //1 - Find the HeapPageId of this pid
+    heapPageId = pid \ (nPages);
+    // 2 - Find the position of the page inside a Heap Page
+    pagePos = pid % (nPages);
+    offset =  heapPageId * heapfile->page_size * (nPages + 1) + (pagePos*heapfile->page_size);
+    
+    // GO to the offset position and retrieve the data
+    fseek(file,offset,SEEK_SET);
+    fread(data,heapfile->page_size,file);
+    
+    page->data = data;
+
+}
+
+/**
+ * Write a page from memory to disk
+ */
+void write_page(Page *page, Heapfile *heapfile, PageID pid);
+
 int main() {
     
     Page *page = new Page();
