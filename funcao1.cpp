@@ -1,37 +1,52 @@
 #include "heapfile.h"
 
+
+
+/**
+ * Compute the number of bytes required to serialize record
+ */
 int fixed_len_sizeof(Record *record){
    int sum = 0; 
    
-   for(int i=0;i<record->size();i++)
+   for(int i=0;i < record->size();i++)
        sum += strlen(record->at(i));
-   
-   return   sum;
+
+   return sum;
 }
  
-void fixed_len_write(Record *record, void *buf) {
-    char *buf_return = new char[fixed_len_sizeof(record)];
+
+/**
+ * Serialize the record to a byte array to be stored in buf.
+ */ 
+void fixed_len_write(Record *record, void * buf) {
+       
+    void* pbuf = buf;
+        
     for(std::vector<V>::iterator i = record->begin(); i != record->end(); i++) {
-        //printf("%s -- sizeof: %ld\n", *i, sizof(**i));
         memcpy(buf, *i, REG_SIZE);
-        //printf("%s -- sizeof: %ld\n", (unsigned char *) buf, sizeof(buf));
-        //memcpy(buf_return, (char *) buf, REG_SIZE);
-        //printf("%s -- sizeof: %ld\n", buf_return, sizeof(buf_return));
         buf = (char *) buf + REG_SIZE;
-        //printf("%s -- sizeof: %ld\n", (char *) buf-10, sizeof(buf));
-        //printf("times");
     }
-    
+    //Returning the pointer to the initial position
+    buf = pbuf;
 }
 
+/**
+ * Deserializes `size` bytes from the buffer, `buf`, and
+ * stores the record in `record`.
+ */
 void fixed_len_read(void *buf, int size, Record *record) {
 
     char* tmp;
     record->reserve(ATTR_TOTAL);
-    
+
+    //Checking how many attributs we have in this buf
+    int attrQty = size / REG_SIZE;
+    printf("%ld",strlen( (char*) buf));
+
     //Inicializating values
-    for(int i =0 ;i < ATTR_TOTAL;i++){
+    for(int i =0 ;i < attrQty;i++){
         V *tmp2 = new V[REG_SIZE];
+        *tmp2 = 0;
         record->push_back(*tmp2); 
         
     }
@@ -39,91 +54,199 @@ void fixed_len_read(void *buf, int size, Record *record) {
     std::vector<V>::iterator it;
     it = record->begin();
     
-    for(int i = 0 ; i < 2; i++) {
+    for(int i = 0 ; i < attrQty; i++) {
            tmp = new char[size];
-           memcpy(tmp, (char *) buf + 2*i,REG_SIZE);    
+           memcpy(tmp, (char *) buf + REG_SIZE*i,REG_SIZE);    
            record->at(i) = (V)tmp;
     }
     
     
 }
 
+//Inicializates a new page
+void _new_page(Page *page){
+
+    int slotsQty = page->page_size / page->slot_size;
+       
+    page->data = calloc(sizeof(char),page->page_size);
+    char *data = (char*) page->data;
+    for(int i = 0; i < page->page_size*sizeof(char)  ; i++)
+        data[i] = '\0';
+
+}
 
 void init_fixed_len_page(Page*& page, int page_size, int slot_size){
     (page) = new Page;
     (page)->page_size = page_size;
     (page)->slot_size = slot_size;
-    
+     
+
+   
+    //Creating a new page
+    _new_page(page);
+
+
+
     //Vector of records 
-    Slots * slots = new Slots[page_size/slot_size];
-//     (page)->data = new Slots[page_size/slot_size];
+    // Slots * slots = new Slots[page_size/slot_size];
+    //     (page)->data = new Slots[page_size/slot_size];
     
+
+
     //Each page has a vector of records 
-    (page)->data = slots;
+    // (page)->data = slots;
     
 }
 
+/**
+ * Calculates the maximal number of records that fit in a page
+ */
 int fixed_len_page_capacity(Page *page){
      return page->page_size/page->slot_size;    
 }
 
+// This finds the position of next free slot
+int _findNextPageSlot(Page *& page){
+    //capacity of the page
+    int capacity = fixed_len_page_capacity(page);
+
+    char * data = (char *) page->data;
+    for(int i =0 ; i < (capacity * page->slot_size);i++){
+        if(data[i] == '\0')
+            return i;
+    }
+
+    return -1;
+}
+
+/**
+ * Calculate the free space (number of free slots) in the page
+ */
 int fixed_len_page_freeslots(Page*& page){
-        Slots *slots;
-         
-        slots = (Slots*) page->data;
-        return  fixed_len_page_capacity(page) - slots->size();
         
- 
+        int totalSlots = fixed_len_page_capacity(page);
+
+        int occupiedSlots = strlen((char*)page->data) / page->slot_size;
+
+        return totalSlots - occupiedSlots;
+
+        // Slots *slots;
+         
+        // slots = (Slots*) page->data;
+        // return  fixed_len_page_capacity(page) - slots->size();
 }
 
 
-
+/**
+ * Add a record to the page
+ * Returns:
+ *   record slot offset if successful,
+ *   -1 if unsuccessful (page full)
+ */
 int add_fixed_len_page(Page*& page, Record *r){
+   //Check is there is space in this page
    if(fixed_len_page_freeslots(page) < 1){
-     return -1; //record slot offset if successful      
+     return -1;       
     }
     
+
+    //Create buf and allocat space for it
+    void* buf;
+    buf =  calloc(sizeof(char),fixed_len_sizeof(r)+1);
+
+    char * data = (char*) page->data;
+
+    //Copy the record to the buffer
+    fixed_len_write(r,buf);
+
+
+    int nextSlot = _findNextPageSlot(page);
+    //offseting the pointer to the slot position
+
+    //copy the buf to the page in the slot available
+    memcpy(data+nextSlot, buf,strlen((char*)buf));
     
-    //Retreving the slots
-    Slots *a;
-    a = (Slots*) page->data;
+    printf("next free Slot: %d\n",nextSlot);
+    printf("data: %s\n", data );
+    // exit(1);
+
+    //Dealocate spage of buf
+    free(buf);
+
+    return nextSlot; 
+    // //Retreving the slots
+    // Slots *a;
+    // a = (Slots*) page->data;
     
-    //Adding the record in the slot
-    a->push_back(r);
+    // //Adding the record in the slot
+    // a->push_back(r);
     
-    //Return the offset
-    return a->size() -1;    
+    // //Return the offset
+    // return a->size() - 1;    
 }
 
-int write_fixed_len_page(Page*& page, int slot, Record *r){
-    //Check if the slot is within the page range
-    if(slot > fixed_len_page_freeslots(page))
-        return -1;
-   //Retreving the slots
-   Slots *a;
-   a = (Slots*) page->data;
+/**
+ * Write a record into a given slot.
+ */
+void write_fixed_len_page(Page*& page, int slot, Record *r){
+    
+
+    //Create buf and allocat space for it
+    void * buf;
+    buf = calloc(sizeof(char),fixed_len_sizeof(r)+1);
+    
+    char * data = (char*) page->data;
+
+    //Copy the record to the buffer
+    fixed_len_write(r,buf);
+
+
+    int nextSlot = slot * page->slot_size;
+    //offseting the pointer to the slot position
+
+    //copy the buf to the page in the slot available
+    memcpy(data+nextSlot, buf,strlen((char*)buf));
+    
+    // printf("next  Slot: %d\n",nextSlot);
+    // printf("data: %s\n", data );
+    // exit(1);
+
+
+   // //Retreving the slots
+   // Slots *a;
+   // a = (Slots*) page->data;
    
-   //Add the record in the slot slot;
-   if(slot < a->size())
-       a->at(slot) = r; 
-   else
-       return -1;
+   // //Add the record in the slot slot;
+   // if(slot < a->size())
+   //     a->at(slot) = r; 
+   // else
+   //     return -1;
    
 }
-
 
 int read_fixed_len_page(Page *page, int slot, Record *& r){
 
-    //Check if the slot is within the page range
-    if(slot > fixed_len_page_freeslots(page))
-        return -1;
+    char * buf;
+    buf = (char*) calloc(sizeof(char),fixed_len_sizeof(r)+1);
+    
+    char * data = (char*) page->data;
 
-   //Retreving the slots
-   Slots *a;
-   a = (Slots*) page->data;
+    int posPage = page->slot_size * slot;
+
+    memcpy(buf, data+posPage,page->slot_size);
+    
+    printf("next  Slot: %d\n",posPage);
+    printf("data: %s\n", buf );
+     // exit(1);
+
+
+   // //Retreving the slots
+   // Slots *a;
+   // a = (Slots*) page->data;
    
-   //save the record in record
-   r = a->at(slot); 
+   // //save the record in record
+   // r = a->at(slot); 
+
 }
 
 
@@ -285,25 +408,30 @@ void read_page(Heapfile *heapfile, PageID pid, Page *page){
     int nPages = _nPages(heapfile);
     int pagePos; //Page position inside of a heap file page
     void *data;
+    
     //We need to go to the page pid offset
     //1 - Find the HeapPageId of this pid
-    heapPageId = pid \ (nPages);
-    // 2 - Find the position of the page inside a Heap Page
-    pagePos = pid % (nPages);
-    offset =  heapPageId * heapfile->page_size * (nPages + 1) + (pagePos*heapfile->page_size);
+    heapPageId = (( int ) pid) / nPages;
     
+    // 2 - Find the position of the page inside a Heap Page
+    pagePos = (( int ) pid) % nPages;
+    offset =  heapPageId * heapfile->page_size * (nPages + 1) + (pagePos*heapfile->page_size);
+
     // GO to the offset position and retrieve the data
     fseek(file,offset,SEEK_SET);
-    fread(data,heapfile->page_size,file);
-    
-    page->data = data;
+    fread(data,sizeof(int),heapfile->page_size,file);
+
+    //page->data = data;
 
 }
 
 /**
  * Write a page from memory to disk
  */
-void write_page(Page *page, Heapfile *heapfile, PageID pid);
+void write_page(Page *page, Heapfile *heapfile, PageID pid){
+
+
+}
 
 int main() {
     
@@ -314,11 +442,15 @@ int main() {
     Record *record4 = new Record();
     
     record1->push_back((V) "5111222333\0");
+    record1->push_back((V) "A111222333\0");
     record2->push_back((V) "6111222333\0");
+    record2->push_back((V) "B111222333\0");
     record3->push_back((V) "7111222333\0");
+    record3->push_back((V) "C111222333\0");
     record4->push_back((V) "8111222333\0");
+    record4->push_back((V) "D111222333\0");
     
-    init_fixed_len_page(page,20,2);
+    init_fixed_len_page(page,40,20);
     
     add_fixed_len_page(page, record1);
     add_fixed_len_page(page, record2);
@@ -326,21 +458,23 @@ int main() {
     write_fixed_len_page(page,0,record3);    
     read_fixed_len_page(page,1,record4);
     
-    Slots *a;
-    a = (Slots*)page->data;
-    printf("%s\n",record4->at(0));     
-    
+    FILE * file;
+
+    file = fopen("test.txt","w");
+    Heapfile * heapfile = new Heapfile;
+    init_heapfile(heapfile,40,file);
+
 
     long int page_size = 0;    
     
     char *buf = new char[page_size];
     
     fixed_len_write(record1, buf);
-    fixed_len_read(buf,20,record2);
+    fixed_len_read(buf,strlen(buf),record2);
         
 //     printf("%s\n",buf
-    std::vector<V>::iterator it;
-    for (it=record2->begin(); it<record2->end(); it++)
-    std::cout << ' ' << *it;
+    // std::vector<V>::iterator it;
+    // for (it=record2->begin(); it<record2->end(); it++)
+    // std::cout << ' ' << *it;
     return 0;
 }
