@@ -1,7 +1,5 @@
 #include "heapfile.h"
 
-
-
 /**
  * Compute the number of bytes required to serialize record
  */
