@@ -340,7 +340,7 @@ void init_heapfile(Heapfile *heapfile, int page_size, FILE *file){
 // This finds the next available slot in the heapfile
 // íf there is no slot returns -1;
 // or the HeapPageId if sucess
-int _nextSlot(Heapfile *heapfile,int * _heapPageId){
+int _nextSlot(Heapfile *heapfile,int *_heapPageId){
     FILE * file = heapfile->file_ptr;
     int nPages = _nPages(heapfile);//# of pages slots inside a Heap Page
     int heapPageId = 0;
@@ -351,10 +351,10 @@ int _nextSlot(Heapfile *heapfile,int * _heapPageId){
     do{
         //This is the last heapPageId there is not 0
         *_heapPageId = heapPageId; 
+        // printf("heapPageId2 %d\n",*_heapPageId );
         
         //Get the first heapPageId
         fread(&heapPageId,sizeof(int),1,file); 
-
         //Go trough a Heap Page
         for(int j=0;j<nPages;j++){
             fread(&pageId,sizeof(int),1,file); 
@@ -379,7 +379,7 @@ PageID alloc_page(Heapfile *heapfile){
 
     FILE * file = heapfile->file_ptr;
     //Fist we need to get the HeapPageId of the last page;
-    int *nextHeapId;
+    int *nextHeapId =  new int();
     int nextSlot = _nextSlot(heapfile,nextHeapId);
     //Check if there is any slot available on the Heapfile
     if(nextSlot != -1)
@@ -461,6 +461,8 @@ int main() {
     file = fopen("test.txt","w");
     Heapfile * heapfile = new Heapfile;
     init_heapfile(heapfile,40,file);
+
+    printf("%d\n",(int) alloc_page(heapfile));
 
 
     long int page_size = 0;    
