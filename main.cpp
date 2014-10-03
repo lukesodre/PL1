@@ -19,9 +19,9 @@ int fixed_len_sizeof(Record *record){
 void fixed_len_write(Record *record, void * buf) {
        
         
+        // printf("fixed_len_write | buf: %s\n",(char*) record->at(0));
     for(std::vector<V>::iterator i = record->begin(); i != record->end(); i++) {
         memcpy(buf, *i, REG_SIZE);
-        // printf("fixed_len_write | buf: %s\n",(char*) *i);
         buf = (char *) buf + REG_SIZE;
     }
     //Returning the pointer to the initial position
@@ -378,7 +378,7 @@ int _nextSlot(Heapfile *heapfile,int *_heapPageId){
                 return pageId;
         }
                // _getHeapPageId(heapfile,heapPageId); 
-             printf("_nextSlot| _heapPageId %d heapPageId %d freeSpace: %d\n",*_heapPageId,heapPageId,freeSpace);
+             // printf("_nextSlot| _heapPageId %d heapPageId %d freeSpace: %d\n",*_heapPageId,heapPageId,freeSpace);
 
         //Go the next Heap Page
         fseek(file, heapfile->page_size*heapPageId*(nPages+1),SEEK_SET);
@@ -477,9 +477,62 @@ void write_page(Page *page, Heapfile *heapfile, PageID pid){
     fseek(file,offset,SEEK_SET);
     fwrite(page->data,sizeof(char),heapfile->page_size,file);
 
-
-
 }
+
+
+class RecordIterator {
+    private:
+        Heapfile * heapfile;
+        Record *record;
+        int currentPage;
+        int currentSlot;
+        Page *page;
+        int nPages;
+        int nSlots;
+
+
+    public:
+
+    RecordIterator(Heapfile *heapfile){
+        // Initializating variables
+        this->heapfile = new Heapfile();
+        this->record = new Record();
+        this->page = new Page();
+        this->heapfile = heapfile;
+        this->currentPage = 0;
+        this->currentSlot = 0;
+        this->nSlots = fixed_len_page_capacity(this->page);
+        this->nPages = _HeapLastPage(this->heapfile)+1;
+       
+        //Read the first page of the HeapFile
+        read_page(this->heapfile,this->currentPage,this->page);
+    }
+
+    Record next(){
+        
+
+        read_fixed_len_page(page,currentSlot,this->record); 
+        this->currentSlot++;
+        
+        if(currentSlot > nSlots && hasNext() ){
+            currentPage++;
+            read_page(this->heapfile,this->currentPage,this->page);
+            this->nSlots = fixed_len_page_capacity(this->page);
+
+            currentSlot = 0;
+        }
+
+        return *this->record;
+
+
+    }
+    bool hasNext(){
+        if(currentPage < nPages)
+            return true;
+        return false;
+    }
+};
+
 
 int main() {
     
@@ -500,7 +553,6 @@ int main() {
     record4->push_back((V) "D111222333\0");
     
     init_fixed_len_page(page,40,20);
-    
     add_fixed_len_page(page, record1);
     add_fixed_len_page(page, record2);
 
@@ -508,6 +560,7 @@ int main() {
     
 
     write_fixed_len_page(page,0,record3);    
+    printf("record3 %s\n",record3->at(0));
     read_fixed_len_page(page,1,record4);
 
     
@@ -519,7 +572,7 @@ int main() {
 
     for(int i = 0 ; i < 30; i++){    
         pageId = (int) alloc_page(heapfile);
-        printf("main|i %d  alloc_page: %d\n",i,pageId);
+        // printf("main|i %d  alloc_page: %d\n",i,pageId);
         write_page(page, heapfile, pageId);
     }
 
