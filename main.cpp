@@ -18,14 +18,14 @@ int fixed_len_sizeof(Record *record){
  */ 
 void fixed_len_write(Record *record, void * buf) {
        
-    void* pbuf = buf;
         
     for(std::vector<V>::iterator i = record->begin(); i != record->end(); i++) {
         memcpy(buf, *i, REG_SIZE);
+        // printf("fixed_len_write | buf: %s\n",(char*) *i);
         buf = (char *) buf + REG_SIZE;
     }
     //Returning the pointer to the initial position
-    buf = pbuf;
+    // buf = pbuf;
 }
 
 /**
@@ -235,6 +235,10 @@ int read_fixed_len_page(Page *page, int slot, Record *& r){
     
     printf("next  Slot: %d\n",posPage);
     printf("data: %s\n", buf );
+
+    fixed_len_read(buf,strlen(buf),r);
+
+    return 0;
      // exit(1);
 
 
@@ -283,6 +287,16 @@ int _HeapLastPage(Heapfile *heapfile){
     return lastHeapPageId;
 }
 
+
+void _getHeapPageId(Heapfile* heapfile,int offset){
+    FILE * file = heapfile->file_ptr;
+    int value = -1;
+    int nPages = _nPages(heapfile);
+    offset = offset*(nPages+1)*heapfile->page_size;
+    fseek(file,offset,SEEK_SET);
+    fread(&value,sizeof(int),1,file);
+    printf("_getHeapPageId %d\n", value);
+}
 //This is used to set the slots and set the free space
 void _new_heapfile(Heapfile *heapfile){
     FILE * file = heapfile->file_ptr;
@@ -300,20 +314,20 @@ void _new_heapfile(Heapfile *heapfile){
         lastPageId++;
         fwrite(&lastPageId,sizeof(int),1,file);
         lastPageId--;
+        printf("_new_heapfile|lastHeapPageId: %d, nPages %d, offset %d,file_init %d, heapfile->page_size %d\n", lastPageId+1,nPages,offset,file_init, heapfile->page_size);
     }
 
 
+    
     //set the Offset the new page
     offset = (lastPageId+1)*(nPages+1)*heapfile->page_size;
     fseek(file,offset,SEEK_SET);
-    
     //Set the pointer after the heapPageId
     fwrite(&file_init,sizeof(int),1,file);
     
     //Inicializates the page with the blank values
     for(int i = 0; i < nPages; i++){
         file_init = (lastPageId+1)*(nPages)+i;
-        printf("_new_heapfile|lastHeapPageId: %d, nPages %d, offset %d,file_init %d, heapfile->page_size %d\n", lastPageId+1,nPages,offset,file_init, heapfile->page_size);
         fwrite(&file_init,sizeof(int),1,file);
         fwrite(&heapfile->page_size,sizeof(int),1,file);
     }
@@ -360,13 +374,14 @@ int _nextSlot(Heapfile *heapfile,int *_heapPageId){
         for(int j=0;j<nPages;j++){
             fread(&pageId,sizeof(int),1,file); 
             fread(&freeSpace,sizeof(int),1,file); 
-            printf("_nextSlot| _heapPageId %d freeSpace: %d\n",*_heapPageId,freeSpace);
             if(freeSpace == heapfile->page_size)
                 return pageId;
         }
+               // _getHeapPageId(heapfile,heapPageId); 
+             printf("_nextSlot| _heapPageId %d heapPageId %d freeSpace: %d\n",*_heapPageId,heapPageId,freeSpace);
 
         //Go the next Heap Page
-        fseek(file, heapfile->page_size*heapPageId*(nPages+1)*heapPageId,SEEK_SET);
+        fseek(file, heapfile->page_size*heapPageId*(nPages+1),SEEK_SET);
     }while(heapPageId != 0);
     
     return -1;
@@ -383,7 +398,7 @@ PageID alloc_page(Heapfile *heapfile){
     int *nextHeapId =  new int();
     int nextSlot = _nextSlot(heapfile,nextHeapId);
     //Check if there is any slot available on the Heapfile
-    printf("Alloc|nextSlot:%d\n", nextSlot);    
+    // printf("Alloc|nextSlot:%d\n", nextSlot);    
     if(nextSlot != -1)
         return nextSlot;
     //There isnt any free slot 
@@ -410,17 +425,20 @@ void read_page(Heapfile *heapfile, PageID pid, Page *page){
     
     //We need to go to the page pid offset
     //1 - Find the HeapPageId of this pid
-    heapPageId = (( int ) pid) / nPages;
+    int pageSlotOffset = (((int) pid)/ nPages) + ((int) pid) + 1;
     
     // 2 - Find the position of the page inside a Heap Page
     pagePos = (( int ) pid) % nPages;
-    offset =  heapPageId * heapfile->page_size * (nPages + 1) + (pagePos*heapfile->page_size);
+    offset =  pageSlotOffset * heapfile->page_size  + (pagePos*heapfile->page_size);
+    // offset = pageSlotOffset*heapfile->page_size;
 
     // GO to the offset position and retrieve the data
     fseek(file,offset,SEEK_SET);
     fread(data,sizeof(char),heapfile->page_size,file);
+    printf("read_page| data %s offset %d\n", data,offset);
 
-    //page->data = data;
+    //setting the data
+    page->data = (void*) data;
 
 }
 
@@ -446,11 +464,11 @@ void write_page(Page *page, Heapfile *heapfile, PageID pid){
     //2 We need to find the slot of the pid within the HeapPageId
     slotPid = (int) pid % nPages;
 
-    offset = heapPageId*heapfile->page_size + (slotPid)*( sizeof(int)*2) + sizeof(int);
+    offset = (nPages+1)*heapPageId * heapfile->page_size + (slotPid)*( sizeof(int)*2) + sizeof(int);
     fseek(file,offset,SEEK_SET);
     fwrite(&_pid,sizeof(int),1,file);
     fwrite(&freeSpace,sizeof(int),1,file);
-
+    // printf("write_page|heapPageId %d ofsset %d freeSpace %d heapfile->size %d\n", heapPageId,offset,freeSpace,heapfile->page_size );
     // Find the right slot position to write the page
     int pageSlotOffset = (((int) pid)/ nPages) + ((int) pid) + 1;
 
@@ -476,7 +494,7 @@ int main() {
     record1->push_back((V) "A111222333\0");
     record2->push_back((V) "6111222333\0");
     record2->push_back((V) "B111222333\0");
-    record3->push_back((V) "7111222333\0");
+    record3->push_back((V) "LUCASLUCAS\0");
     record3->push_back((V) "C111222333\0");
     record4->push_back((V) "8111222333\0");
     record4->push_back((V) "D111222333\0");
@@ -488,9 +506,7 @@ int main() {
 
     init_fixed_len_page(page2,40,20);
     
-    add_fixed_len_page(page2, record1);
-    add_fixed_len_page(page2, record2);
-    
+
     write_fixed_len_page(page,0,record3);    
     read_fixed_len_page(page,1,record4);
 
@@ -501,26 +517,27 @@ int main() {
     Heapfile * heapfile = new Heapfile;
     init_heapfile(heapfile,40,file);
 
-    for(int i = 0 ; i < 5; i++){    
+    for(int i = 0 ; i < 30; i++){    
         pageId = (int) alloc_page(heapfile);
-        printf("alloc_page: %d\n",pageId);
+        printf("main|i %d  alloc_page: %d\n",i,pageId);
         write_page(page, heapfile, pageId);
     }
 
 
-
-    read_page(heapfile, pageId,page2);
+    // write_fixed_len_page(page2,0,record3);   
+    read_page(heapfile, 0 ,page2);
     
     Record * new_record  = new Record();
-    read_fixed_len_page(page2,1,new_record); 
+    read_fixed_len_page(page2,0,new_record); 
+
     // long int page_size = 0;    
     
-    // char *buf = new char[page_size];
+    char *buf = new char();
     
-    // fixed_len_write(record1, buf);
-    // fixed_len_read(buf,strlen(buf),record2);
+    fixed_len_write(new_record, buf);
+    // fixed_len_read(buf,strlen(buf),new_record);
         
-//     printf("%s\n",buf
+    printf("main| buffer: %s\n",buf);
     // std::vector<V>::iterator it;
     // for (it=record2->begin(); it<record2->end(); it++)
     // std::cout << ' ' << *it;
