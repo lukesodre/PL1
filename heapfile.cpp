@@ -191,7 +191,9 @@ void write_fixed_len_page(Page*& page, int slot, Record *r){
     // exit(1);
    
 }
-
+/**
+ * Read a record from the page from a given slot.
+ */
 int read_fixed_len_page(Page *page, int slot, Record *& r){
 
     char * buf;
@@ -203,8 +205,8 @@ int read_fixed_len_page(Page *page, int slot, Record *& r){
 
     memcpy(buf, data+posPage,page->slot_size);
     
-    // printf("next  Slot: %d\n",posPage);
-    // printf("data: %s\n", buf );
+    // printf("read_fixed_len_page 1| posPage: %d slot %d slot_size %d\n",posPage,slot,page->slot_size);
+    // printf("read_fixed_len_page 2| buf %s \n", data );
 
     fixed_len_read(buf,strlen(buf),r);
 
@@ -392,17 +394,18 @@ void read_page(Heapfile *heapfile, PageID pid, Page *page){
     int pageSlotOffset = (((int) pid)/ nPages) + ((int) pid) + 1;
     
     // 2 - Find the position of the page inside a Heap Page
-    pagePos = (( int ) pid) % nPages;
-    offset =  pageSlotOffset * heapfile->page_size  + (pagePos*heapfile->page_size);
+    pagePos = (( int ) pid) / nPages;
+    offset =  pageSlotOffset * heapfile->page_size ;//+  ((pagePos)*heapfile->page_size);
     // offset = pageSlotOffset*heapfile->page_size;
 
     // GO to the offset position and retrieve the data
     fseek(file,offset,SEEK_SET);
     fread(data,sizeof(char),heapfile->page_size,file);
-    // printf("read_page| data %s offset %d\n", data,offset);
 
     //setting the data
     page->data = (void*) data;
+    // printf("read_page| pid %d offset %d pageSlotOffset %d pagePos %d page-data %s\n",
+        // pid,offset,pageSlotOffset,pagePos,data);
 
 }
 
@@ -432,12 +435,13 @@ void write_page(Page *page, Heapfile *heapfile, PageID pid){
     fseek(file,offset,SEEK_SET);
     fwrite(&_pid,sizeof(int),1,file);
     fwrite(&freeSpace,sizeof(int),1,file);
-    // printf("write_page|heapPageId %d ofsset %d freeSpace %d heapfile->size %d\n", heapPageId,offset,freeSpace,heapfile->page_size );
     // Find the right slot position to write the page
     int pageSlotOffset = (((int) pid)/ nPages) + ((int) pid) + 1;
 
     // GO to the offset position and write the data
     offset = pageSlotOffset*heapfile->page_size;
+    printf("write_page|pid %d heapPageId %d ofsset %d freeSpace %d heapfile->size %d\n",
+     pid,heapPageId,offset,freeSpace,heapfile->page_size );
     fseek(file,offset,SEEK_SET);
     fwrite(page->data,sizeof(char),heapfile->page_size,file);
 
