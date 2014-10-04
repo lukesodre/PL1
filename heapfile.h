@@ -107,3 +107,19 @@ int _findNextPageSlot(Page *& page);
 
 
 
+class RecordIterator {
+    private:
+        Heapfile * heapfile;
+        Record *record;
+        int currentPage;
+        int currentSlot;
+        Page *page;
+        int nPages;
+        int nSlots;
+
+    public:
+
+    RecordIterator(Heapfile *heapfile);
+    Record next();
+    bool hasNext();
+};
