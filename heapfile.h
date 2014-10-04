@@ -46,6 +46,9 @@ int fixed_len_sizeof(Record *record);
  */
 void fixed_len_read(void *buf, int size, Record *record);
 
+void fixed_len_write(Record *record, void * buf);
+
+
 void _new_page(Page *page);
 
 void init_fixed_len_page(Page*& page, int page_size, int slot_size);
@@ -81,7 +84,7 @@ int _HeapLastPage(Heapfile *heapfile);
 
 void _new_heapfile(Heapfile *heapfile);
 
-void init_heapfile(Heapfile *heapfile, int page_size, FILE *file);
+void init_heapfile(Heapfile *, int , FILE *);
 
 int _nextSlot(Heapfile *heapfile,int * _heapPageId);
 
