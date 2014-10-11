@@ -73,6 +73,8 @@ int main(int argc, char const *argv[]){
 
     strcpy(location_final,location_tmp);
     strcat(location_final,(char*)argv[2]);
+    printf("location %s", location_final);
+
     
     Heapfile * heapfile;
     fileHeapFile = fopen(location_final, "rb+");
