@@ -11,7 +11,7 @@ int fixed_len_sizeof(Record *record){
         if(record->at(i) != NULL)
             sum += strlen(record->at(i));
     }
-    printf("fixed_len_sizeof|  %d\n",sum );
+    //printf("fixed_len_sizeof|  %d\n",sum );
     return sum;
 }
  
@@ -263,7 +263,7 @@ void _new_heapfile(Heapfile *heapfile){
         lastPageId++;
         fwrite(&lastPageId,sizeof(int),1,file);
         lastPageId--;
-        printf("_new_heapfile|lastHeapPageId: %d, nPages %d, offset %d,file_init %d, heapfile->page_size %d\n", lastPageId+1,nPages,offset,file_init, heapfile->page_size);
+        //printf("_new_heapfile|lastHeapPageId: %d, nPages %d, offset %d,file_init %d, heapfile->page_size %d\n", lastPageId+1,nPages,offset,file_init, heapfile->page_size);
     }
 
 
@@ -446,13 +446,12 @@ RecordIterator::RecordIterator(Heapfile *heapfile){
 
 
     // printf("RecordIterator| heap->p_Size %d\n",this->heapfile->page_size );
-    init_fixed_len_page(this->page,this->heapfile->page_size,ATTR_TOTAL*REG_SIZE);//TODO Change 20 to ATTR_TOTAL after
+    init_fixed_len_page(this->page,this->heapfile->page_size,ATTR_TOTAL*REG_SIZE);
     this->nSlots = fixed_len_page_capacity(this->page);
     
-    // TODO FIX THIS NUMBER
     this->nPages = (_HeapLastPage(this->heapfile)+1);
-    printf("RecordIterator::RecordIterator| _HeapLastPage  %d _nPages  %d\n",
-     _HeapLastPage(this->heapfile)+1,_nPages(heapfile));
+    //printf("RecordIterator::RecordIterator| _HeapLastPage  %d _nPages  %d\n",
+     //_HeapLastPage(this->heapfile)+1,_nPages(heapfile));
    
     //Read the first page of the HeapFile
     read_page(this->heapfile,this->currentPage,this->page);
@@ -468,7 +467,7 @@ Record  RecordIterator::next(){
         currentPage++;
         read_page(this->heapfile,this->currentPage,this->page);
         this->nSlots = fixed_len_page_capacity(this->page);
-        printf("RecordIterator::next| currentSlot %d currentPage %d  nSlots %d  nPages %d\n",this->currentSlot,currentPage,nSlots,nPages );
+        //printf("RecordIterator::next| currentSlot %d currentPage %d  nSlots %d  nPages %d\n",this->currentSlot,currentPage,nSlots,nPages );
 
         this->currentSlot = 0;
         return *this->record;
@@ -494,8 +493,8 @@ bool RecordIterator::hasNext(){
     }
 
     if(currentPage <= nextFreePid){
-    printf("RecordIterator::hasNext|nPages %d heapPageId %d nextFreePid %d currentPage %d data_size %d len_data %d\n",
-        nPages,heapPageId,nextFreePid,currentPage,strlen((char*)page->data),len_data);
+    //printf("RecordIterator::hasNext|nPages %d heapPageId %d nextFreePid %d currentPage %d data_size %d len_data %d\n",
+        //nPages,heapPageId,nextFreePid,currentPage,strlen((char*)page->data),len_data);
          // currentPage++;
         if((currentPage+1) < nPages)
             return true;
