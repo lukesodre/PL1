@@ -112,12 +112,12 @@ int main(int argc, char const *argv[]){
 
     printf("%s -- %s\n", location_final, location_return_attr);
     
-    Heapfile * heapfile;
+    Heapfile * heapfile = new Heapfile();
     fileHeapFile = fopen(location_final, "rb+");
     init_heapfile(heapfile, page_size, fileHeapFile);
 
     // heapfile to hold return_attribute_id pages
-    Heapfile * heapfile_return;
+    Heapfile * heapfile_return = new Heapfile();
     fileHeapFile_return = fopen(location_return_attr, "rb+");
     init_heapfile(heapfile_return, page_size, fileHeapFile_return);
 
