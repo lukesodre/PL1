@@ -1,4 +1,20 @@
 #include "heapfile.h"
+#include <iostream>
+#include <sys/timeb.h>
+
+int getMilliCount(){
+    timeb tb;
+    ftime(&tb);
+    int nCount = tb.millitm + (tb.time & 0xfffff) * 1000;
+    return nCount;
+}
+
+int getMilliSpan(int nTimeStart){
+    int nSpan = getMilliCount() - nTimeStart;
+    if(nSpan < 0)
+        nSpan += 0x100000 * 1000;
+    return nSpan;
+}
 
 void _select3(Heapfile * heapfile,Heapfile * heapfile_return, char* start, char* end) {
     FILE * file = heapfile->file_ptr;
@@ -78,6 +94,9 @@ void _select3(Heapfile * heapfile,Heapfile * heapfile_return, char* start, char*
 
 int main(int argc, char const *argv[]){
 
+    printf("Starting timer...\n");
+    int start = getMilliCount();
+
     if (argc != 7) {
         printf("ARITY ERROR Found %d Wanted 6 args\n<colstore_name> <attribute_id> <return_attribute_id> <start> <end> <page_size>",
                 argc - 1);
@@ -109,8 +128,6 @@ int main(int argc, char const *argv[]){
     
     strcat(location_final,(char*)argv[2]);
     strcat(location_return_attr,(char*)argv[3]);
-
-    printf("%s -- %s\n", location_final, location_return_attr);
     
     Heapfile * heapfile = new Heapfile();
     fileHeapFile = fopen(location_final, "rb+");
@@ -127,5 +144,9 @@ int main(int argc, char const *argv[]){
     free(location_final);
 
     free(location_return_attr);
+
+    int milliSecondsElapsed = getMilliSpan(start);
+    printf("Elapsed time = %u milliseconds\n", milliSecondsElapsed);
+    
     return 0;
 }
